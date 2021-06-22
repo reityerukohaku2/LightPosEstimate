@@ -1,0 +1,8 @@
+Photo/
+logs/
+dataSet/
+__pychache__/
+*.pth
+model
+*.onnx
+main.ipynb
