@@ -19,7 +19,7 @@ class MyDataSet(torch.utils.data.Dataset):
         y = []
         z = []
 
-        path = ""   #csvファイルのパスを指定する
+        path = "C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/Train.csv"   #csvファイルのパスを指定する
         label = pd.read_csv(filepath_or_buffer=path, encoding="UTF-8", sep=",", index_col=0)
 
         #前処理の宣言
@@ -42,8 +42,9 @@ class MyDataSet(torch.utils.data.Dataset):
 
 
         # ここに入力データとラベルを入れる
-
-        self.RGBimagePaths = [str(p) for p in Path("dataSet/tensor_data/RGB/").glob("*.pt")]
+        #self.RGBimagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/RGB/").glob("*.png")]
+        #self.DepthImagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/Depth/").glob("*.png")]
+        self.RGBimagePaths = [str(p) for p in Path("dataSet/tensor_data/Gray/").glob("*.pt")]
         self.DepthImagePaths = [str(p) for p in Path("dataSet/tensor_data/Depth/").glob("*.pt")]
 
         #ファイル名ソート用

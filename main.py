@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from DataSet import MyDataSet
-import Net
+import GrayNet as Net
 
 #学習率スケジューラ
 class LearningRateScheduler:
@@ -61,14 +61,14 @@ def loop():
     criterion = nn.MSELoss()            #損失関数は平均2乗誤差
     torch.backends.cudnn.benchmark = True
 
-    epoch = 60
+    epoch = 1
     lr = 1e-3
     lr_scheduler = LearningRateScheduler(lr, epoch)
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_scheduler)
     scaler = torch.cuda.amp.GradScaler()
 
-    writer = SummaryWriter(log_dir="./logs/epoch60")
+    writer = SummaryWriter(log_dir="./logs/test")
 
     for i in range(epoch):
         model.train()
@@ -97,6 +97,8 @@ def loop():
             with torch.cuda.amp.autocast():
                 #学習
                 #with torch.cuda.amp.autocast():
+                #print(RGBimage.shape)
+                #print(DepthImage.shape)
                 out_x, out_y, out_z = model(RGBimage, DepthImage)
                 x = x.unsqueeze(1)
                 y = y.unsqueeze(1)
@@ -125,7 +127,7 @@ def loop():
             #del loss_x, loss_y, loss_z, RGBimage, DepthImage, x, y, z, loss
 
         test_loss /= test_size
-        writer.add_scalars("losses", { "loss_size200_lr1e-3_batch64_pow09": test_loss, } , i)
+        writer.add_scalars("losses", { "gray_loss_size200_lr1e-3_batch64_pow09": test_loss, } , i)
         #writer.add_histogram("fc_x.weights", model.fc_x.weight, i)
         #writer.add_histogram("fc_y.weights", model.fc_y.weight, i)
         #writer.add_histogram("fc_z.weights", model.fc_z.weight, i)
@@ -161,7 +163,7 @@ def loop():
 
         loss /= val_size
 
-        writer.add_scalars("losses", {"val-loss_size200_lr1e-3_batch64_pow09": loss,} ,
+        writer.add_scalars("losses", {"gray_val-loss_size200_lr1e-3_batch64_pow09": loss,} ,
                                         i)
         writer.add_scalar("Lerning Rate", np.array(scheduler.get_lr()), i)
         print("lr=" + str(scheduler.get_lr()))
@@ -173,7 +175,29 @@ def loop():
         """
         scheduler.step()
 
-    torch.save(model.to("cpu").state_dict(), os.getcwd() + "/epoch60_size200_lr1e-3__batch64_pow09.pth")
+    torch.save(model.to("cpu").state_dict(), os.getcwd() + "/gray_epoch60_size200_lr1e-3__batch64_pow09.pth")
+
+    model.eval()
+    loss = 0
+    step = 0
+    torch.set_grad_enabled(False)
+    ave_dist = 0
+    for (RGBimage, DepthImage, x, y, z) in testLoader:
+        out_x, out_y, out_z = model(RGBimage, DepthImage)
+        x = x.unsqueeze(1)
+        y = y.unsqueeze(1)
+        z = z.unsqueeze(1)
+
+        dist = torch.sqrt((x - out_x) ** 2 + (y - out_y) ** 2 + (z - out_z) ** 2)
+        ave_dist += dist
+        print("x:" + str(x) + " out_x:" + str(out_x))
+        print("y:" + str(y) + " out_y:" + str(out_y))
+        print("z:" + str(z) + " out_z:" + str(out_z))
+        print("dist:" + str(dist))
+        step += 1
+
+    ave_dist /= step
+    print("ave_dist:" + ave_dist)
 
 if __name__ == "__main__":
     loop()
