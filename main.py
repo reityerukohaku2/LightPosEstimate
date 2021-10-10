@@ -51,9 +51,9 @@ def loop():
     batchSize = 64
     print("cpu_count:" + str(os.cpu_count()))
     #sampler = MySampler.MySampler(batch_size=batchSize, shuffle=True, sampler=train_dataset)
-    trainLoader = DataLoader(train_dataset, batch_size=batchSize, shuffle=True, num_workers = os.cpu_count(), pin_memory = True)
-    valLoader = DataLoader(val_dataset, batch_size = 1, shuffle = False, num_workers = os.cpu_count(), pin_memory = True)
-    testLoader = DataLoader(test_dataset, batch_size = 1, shuffle = False, num_workers = os.cpu_count(), pin_memory = True)
+    trainLoader = DataLoader(train_dataset, batch_size=batchSize, shuffle=True, num_workers = os.cpu_count() - 1, pin_memory = True)
+    valLoader = DataLoader(val_dataset, batch_size = 1, shuffle = False, num_workers = os.cpu_count() - 1, pin_memory = True)
+    testLoader = DataLoader(test_dataset, batch_size = 1, shuffle = False, num_workers = os.cpu_count() - 1, pin_memory = True)
 
     #学習の準備
     model = Net.MyResNet50(1)           #モデルの読み込み
@@ -64,7 +64,7 @@ def loop():
     epoch = 1
     lr = 1e-3
     lr_scheduler = LearningRateScheduler(lr, epoch)
-    optimizer = optim.AdamW(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr) #重み減衰追加した
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_scheduler)
     scaler = torch.cuda.amp.GradScaler()
 
@@ -126,8 +126,10 @@ def loop():
 
             #del loss_x, loss_y, loss_z, RGBimage, DepthImage, x, y, z, loss
 
+        #lossをtensorBoardに書き込み
         test_loss /= test_size
-        writer.add_scalars("losses", { "gray_loss_size200_lr1e-3_batch64_pow09": test_loss, } , i)
+        #writer.add_scalars("losses", { "loss_drop3-2_epoch200_size200_lr1e-3_batch64_pow09": test_loss, } , i)
+        writer.add_scalars("losses", { "kernelTest": test_loss, } , i)
         #writer.add_histogram("fc_x.weights", model.fc_x.weight, i)
         #writer.add_histogram("fc_y.weights", model.fc_y.weight, i)
         #writer.add_histogram("fc_z.weights", model.fc_z.weight, i)
@@ -163,8 +165,11 @@ def loop():
 
         loss /= val_size
 
-        writer.add_scalars("losses", {"gray_val-loss_size200_lr1e-3_batch64_pow09": loss,} ,
-                                        i)
+        #val_loss書き込み
+        #writer.add_scalars("losses", {"valLoss_drop3-2_epoch200_size200_lr1e-3_batch64_pow09": loss,} ,
+        #                                i)
+
+        #学習率書き込み
         writer.add_scalar("Lerning Rate", np.array(scheduler.get_lr()), i)
         print("lr=" + str(scheduler.get_lr()))
 
@@ -175,8 +180,14 @@ def loop():
         """
         scheduler.step()
 
-    torch.save(model.to("cpu").state_dict(), os.getcwd() + "/gray_epoch60_size200_lr1e-3__batch64_pow09.pth")
+    #訓練済みモデル保存
+    #torch.save(model.to("cpu").state_dict(), os.getcwd() + "/drop3-2_epoch200_size200_lr1e-3_batch64_pow09.pth")
+    torch.save(model.to("cpu").state_dict(), os.getcwd() + "/kernelTest.pth")
 
+
+    #############
+    ###~~推論~~###
+    ##############
     model.eval()
     loss = 0
     step = 0
@@ -190,14 +201,11 @@ def loop():
 
         dist = torch.sqrt((x - out_x) ** 2 + (y - out_y) ** 2 + (z - out_z) ** 2)
         ave_dist += dist
-        print("x:" + str(x) + " out_x:" + str(out_x))
-        print("y:" + str(y) + " out_y:" + str(out_y))
-        print("z:" + str(z) + " out_z:" + str(out_z))
         print("dist:" + str(dist))
         step += 1
 
     ave_dist /= step
-    print("ave_dist:" + ave_dist)
+    print("ave_dist:" + str(ave_dist))
 
 if __name__ == "__main__":
     loop()
