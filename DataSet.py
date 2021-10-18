@@ -42,7 +42,6 @@ class MyDataSet(torch.utils.data.Dataset):
         ).cuda()
         """
 
-
         # ここに入力データとラベルを入れる
         #self.RGBimagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/RGB/").glob("*.png")]
         #self.DepthImagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/Depth/").glob("*.png")]
@@ -81,7 +80,6 @@ class MyDataSet(torch.utils.data.Dataset):
 
     #DataLoader使うときに呼ばれる
     def __getitem__(self, idx):
-
         #RGBimage = torch.from_numpy(np.load(file=self.RGBimagePaths[idx]))
         #DepthImage = torch.from_numpy(np.load(file=self.DepthImagePaths[idx]))
         out_RGBimage = torch.load(self.RGBimagePaths[idx])
@@ -104,4 +102,6 @@ class MyDataSet(torch.utils.data.Dataset):
         out_y = self.y[idx]
         out_z = self.z[idx]
 
-        return out_RGBimage, out_DepthImage, out_x, out_y, out_z
+        out = torch.tensor([out_x, out_y, out_z], dtype=torch.float32)
+
+        return out_RGBimage, out_DepthImage, out
