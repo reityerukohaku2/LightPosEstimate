@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from numpy.lib.function_base import append
 
 #最大値を255，最小値を0にする
 def min_max(x, axis=None):
@@ -12,87 +13,98 @@ def min_max(x, axis=None):
     return result
 
 raw = cv2.imread("images/figure2a.png")
-raw = raw
-raw = raw.astype(np.float_)
-raw = raw / 255
+height, width, channel = raw.shape
 
-B,G,R = cv2.split(raw)
+#raw = raw
+raw_float = raw.astype(np.float_)
+#raw = raw / 255
 
-#7*7でRGB平均化
-R = cv2.blur(R, (7, 7))
-G = cv2.blur(G, (7, 7))
-B = cv2.blur(B, (7, 7))
+B,G,R = cv2.split(raw_float)
 
-np.where(R == 0, 0.0001, R)
-np.where(G == 0, 0.0001, G)
-np.where(B == 0, 0.0001, B)
+#0の値を極小値に置き換え(0除算回避)
+R = np.where(R <= 0, 0.00001, R)
+G = np.where(G <= 0, 0.00001, G)
+B = np.where(B <= 0, 0.00001, B)
 
 I = R + G + B
 #I = np.sqrt(I)
 
-'''
-C = np.array([[0, 0, 1, 0, 0],
-              [0, 1, 2, 1, 0],
-              [1, 2, -16, 2, 1],
-              [0, 1, 2, 1, 0],
-              [0, 0, 1, 0, 0]])
-'''
+C = np.array([[0, 0, -1, 0, 0],
+              [0, -1, -2, -1, 0],
+              [-1, -2, 16, -2, -1],
+              [0, -1, -2, -1, 0],
+              [0, 0, -1, 0, 0]])
+
 
 ksize=5
-C=np.empty([ksize,ksize],dtype='float')
-sigma=0.3*(ksize/2-1)+0.8
-for y in range(int(-ksize/2),int(ksize/2)):
-    for x in range(int(-ksize/2),int(ksize/2)):
-        C[x,y]=(x**2+y**2-2*(sigma**2))/(2*3.14*sigma**6)*math.exp(-(x**2+y**2)/(2*sigma**2))
-print(C)
+# #CはLoGフィルタ
+# C = np.empty([ksize,ksize],dtype='float')
+# sigma = 3
+# for y in range(0, ksize):
+#     for x in range(0, ksize):
+#         C[x,y] = (x**2 + y**2 - 2 * (sigma**2)) / (2 * math.pi * sigma**6) * math.exp(-(x**2 + y**2) / (2 * sigma**2))
 
-#mask low contrast pixels
+
+#式（11）
+log_i = np.log(I)
+log_r = np.log(R) - log_i
+log_r = cv2.filter2D(log_r, -1, C)
+log_b = np.log(B) - log_i
+log_b = cv2.filter2D(log_b, -1, C)
+preGI = np.sqrt(log_b**2 + log_r**2)
+
+#式(12)
+E = 1e-4
 delta_r = cv2.filter2D(R, -1, C)
 delta_g = cv2.filter2D(G, -1, C)
 delta_b = cv2.filter2D(B, -1, C)
-np.where(R == delta_r, 255, R)
-np.where(G == delta_g, 255, G)
-np.where(B == delta_b, 255, B)
+del_index = np.where((delta_r < E) & (delta_b < E) & (delta_g < E))
+print(del_index)
+GI = preGI
 
+#カメラノイズによる孤立したグレーピクセルを除去
+GI = cv2.blur(preGI, (7, 7))
 
-log_i = np.log(I)
+#式(12)で求めた除去画素を除去
+GI[del_index] = 60
 
-log_r = np.log(R) - log_i
-log_r = cv2.filter2D(log_r, -1, C)
-#log_r = cv2.GaussianBlur(log_r, (5, 5), 3)
-#log_r = cv2.Laplacian(log_r, cv2.CV_32F, ksize=5)
+#最もグレーである可能性が高い上位0.1%のピクセルを取得
+#まずは1次元配列に
+flat_GI = GI.flatten(order="F")
 
-log_b = np.log(B) - log_i
-log_b = cv2.filter2D(log_b, -1, C)
-#log_b = cv2.GaussianBlur(log_b, (5, 5), 3)
-#log_b = cv2.Laplacian(log_b, cv2.CV_32F, ksize=5)
+#ソート
+sorted_GI = np.argsort(flat_GI)
 
-preGI = np.sqrt(log_b**2 + log_r**2)
+#下位0.1%のインデックスを保存
+sorted_GI = np.delete(sorted_GI, np.s_[(int)(sorted_GI.size * 0.01):], 0)
+print(sorted_GI.size)
+#most_gray_indexのマスク画像作る(デバッグ用)
+#平均色を求める
+avg = np.zeros(3, np.float32)
+raw_mask = np.zeros((height, width, channel), np.uint8)
+for i in sorted_GI:
+    raw_mask[i % height][i // height] = raw[i % height][i // height]
+    avg += raw[i % height][i // height]
 
-ranked = preGI.flatten(preGI)
-print(ranked)
+avg /= sorted_GI.size
+color = np.zeros((200, 200, 3), np.uint8)
+color[:][:] = avg
 
-"""
-R = min_max(R).astype(np.uint8)
-G = min_max(G).astype(np.uint8)
-B = min_max(B).astype(np.uint8)
-I = min_max(I).astype(np.uint8)
+#画像出力
+plt.figure()
+plt.imshow(color.astype(np.uint))
 
-log_b = (min_max(log_b)).astype(np.uint8)
-log_r = (min_max(log_r)).astype(np.uint8)
-preGI = (min_max(preGI)).astype(np.uint8)
+plt.figure()
+raw = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+plt.imshow(raw)
 
-raw = min_max(raw).astype(np.uint8)
-cv2.imshow("RAW", raw)
-cv2.imshow("Red", R)
-cv2.imshow("Green", G)
-cv2.imshow("Blue", B)
-cv2.imshow("log_r", log_r)
-cv2.imshow("log_b", log_b)
-cv2.imshow("Intensity", preGI)
-plt.imshow(preGI, cmap=plt.cm.brg)
+plt.figure()
+plt.title("raw_mask")
+raw_mask = cv2.cvtColor(raw_mask, cv2.COLOR_BGR2RGB)
+plt.imshow(raw_mask)
+
+plt.figure()
+plt.imshow(GI, cmap = "rainbow")
 plt.colorbar()
-plt.show()
 
-cv2.waitKey()
-"""
+plt.show()
