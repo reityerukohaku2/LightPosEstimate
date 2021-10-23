@@ -69,7 +69,7 @@ class PreProcessDataSet(torch.utils.data.Dataset):
         #numpy配列に変換
         GrayImage = np.transpose(GrayImage.numpy(), (1, 2, 0))
 
-        #バイラテラルフィルタ
+        #バイラテラルフィルタ(嘘です)
         GrayImage = cv2.cv2.ximgproc.dtFilter(GrayImage, GrayImage, 0, 32)
 
         #適応的ヒストグラム平坦化
