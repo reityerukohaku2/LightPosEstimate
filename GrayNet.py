@@ -33,6 +33,7 @@ class Block(nn.Module):
         # Batch Normalization
         self.bn1 = nn.BatchNorm2d(channel)
         self.bn2 = nn.BatchNorm2d(channel_out)
+        #self.drop = nn.Dropout2d(0.5)
 
     def forward(self, x):
         h = self.conv1(x)
@@ -44,6 +45,7 @@ class Block(nn.Module):
 
         h = self.conv3(h)
         h = self.bn2(h)
+        #h = self.drop(h)
         shortcut = self.shortcut(x)
         y = self.relu3(h + shortcut)  # skip connection
         return y
@@ -67,6 +69,7 @@ class MyResNet50(nn.Module):
         self.bn1 = nn.BatchNorm2d(64)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(2, 2)
+        #self.drop1 = nn.Dropout2d(0.2)
 
         # Block 1(Green)
         self.block0 = Block(channel_in=64, channel_out= 256, first_block=True)
@@ -94,13 +97,14 @@ class MyResNet50(nn.Module):
 
         #average pool以降
         self.avg_pool = GlobalAvgPool2d()  # TODO: GlobalAvgPool2d
+        #self.drop2 = nn.Dropout2d(0.5)
         self.fc_256 = nn.Linear(2048, 256)
         self.fc_64_ReLu = nn.Linear(256, 64)
         self.fc_64_linear = nn.Linear(64, 64)
         self.fc_3 = nn.Linear(64, 3)
-        self.fc_x = nn.Linear(3, output_dim)
-        self.fc_y = nn.Linear(3, output_dim)
-        self.fc_z = nn.Linear(3, output_dim)
+        #self.fc_x = nn.Linear(3, output_dim)
+        #self.fc_y = nn.Linear(3, output_dim)
+        #self.fc_z = nn.Linear(3, output_dim)
 
     def forward(self, RGBimage, DepthImage):
         input = torch.cat((RGBimage, DepthImage), 1)
@@ -110,6 +114,7 @@ class MyResNet50(nn.Module):
         h = self.bn1(h)
         h = self.relu1(h)
         h = self.pool1(h)
+        #h = self.drop1(h)
 
         h = self.block0(h)
         h = self.block1(h)
@@ -132,6 +137,7 @@ class MyResNet50(nn.Module):
         h = self.block15(h)
 
         h = self.avg_pool(h)
+        #h = self.drop2(h)
         h = self.fc_256(h)
         h = torch.relu(h)
 
@@ -139,18 +145,16 @@ class MyResNet50(nn.Module):
         h = torch.relu(h)
 
         h = self.fc_64_linear(h)
-        #h = nn.Identity(h)
 
         h = self.fc_3(h)
-        #h = nn.Identity(h)
 
-        x = self.fc_x(h)
-        y = self.fc_y(h)
-        z = self.fc_z(h)
+        #x = self.fc_x(h)
+        #y = self.fc_y(h)
+        #z = self.fc_z(h)
 
-        return x, y, z
+        return h
 class GlobalAvgPool2d(nn.Module):
     def __init__(self, device='cuda'):
         super().__init__()
     def forward(self, x):
-        return F.avg_pool2d(x, kernel_size=x.size()[2:]).view(-1, x.size(1))
+        return F.avg_pool2d(x, torch.Size([7, 7])).view(-1, x.size(1))

@@ -1,4 +1,5 @@
 import os
+from numpy.lib.function_base import append
 import torch
 import torchvision.transforms as transforms
 import torch.utils.data
@@ -12,13 +13,14 @@ from pathlib import Path
 import cv2
 from pathlib import Path
 import re
+import itertools
 
 class PreProcessDataSet(torch.utils.data.Dataset):
     def __init__(self, imageSize, train = True):
 
         self.trainFlag = train
-        #外れ値ID
-        error_ids = [14313]
+        #外れ値ID(0スタート)
+        error_ids = []
 
         #正解ラベル
         x = []
@@ -33,7 +35,7 @@ class PreProcessDataSet(torch.utils.data.Dataset):
         ).cuda()
 
         # ここに入力データとラベルを入れる
-        self.RGBimagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/RGB/").glob("*.png")]
+        self.RGBimagePaths = [str(p) for p in Path("Photo/Depth").glob("*.png")]
 
         #ファイル名ソート用
         def atoi(text):
@@ -47,10 +49,12 @@ class PreProcessDataSet(torch.utils.data.Dataset):
 
         #外れ値の削
         if len(error_ids) != 0:
+            del_num = 0
             for id in error_ids:
                 print("before:" + str(len(self.RGBimagePaths)))
                 print("del_path:" + self.RGBimagePaths[id])
-                del self.RGBimagePaths[id]
+                del self.RGBimagePaths[id - del_num]
+                del_num += 1
                 print("del:" + str(id))
                 print("after:" + str(len(self.RGBimagePaths)))
 
@@ -67,26 +71,20 @@ class PreProcessDataSet(torch.utils.data.Dataset):
         GrayImage = self.FirstTransform(RGBimage)
 
         #numpy配列に変換
-        GrayImage = np.transpose(GrayImage.numpy(), (1, 2, 0))
+        #GrayImage = np.transpose(GrayImage.numpy(), (1, 2, 0))
 
-        #バイラテラルフィルタ(嘘です)
-        GrayImage = cv2.cv2.ximgproc.dtFilter(GrayImage, GrayImage, 0, 32)
+        #バイラテラルフィルタ(domain transform filter)
+        #GrayImage = cv2.cv2.ximgproc.dtFilter(GrayImage, GrayImage, 0, 32)
 
         #適応的ヒストグラム平坦化
-        clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(4,4))
-        GrayImage = clahe.apply(GrayImage.astype(np.uint8))
-        #after = cv2.equalizeHist(GrayImage.astype(np.uint8))
-        #ret, after = cv2.threshold(after, 0, 255, cv2.THRESH_OTSU)
-        #kernel = np.ones((3,3), np.uint8)
-        #after = cv2.morphologyEx(after, cv2.MORPH_CLOSE, kernel)
+        #clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(4,4))
+        #GrayImage = clahe.apply(GrayImage.astype(np.uint8))
 
         #tensorに変換
-        #GrayImage = np.expand_dims(GrayImage, 0)
-        out_image = torch.from_numpy(GrayImage.astype(np.float32))
-        out_image = out_image / 256.0
-        #out_image = self.SecondTransform(GrayImage)
+        #out_image = torch.from_numpy(GrayImage.astype(np.float32))
+        #out_image = out_image / 256.0
 
-        return out_image
+        return GrayImage #out_image
 
 #データセットの保存
 def loop():
@@ -95,7 +93,7 @@ def loop():
 
     i = 0
     for image in dataLoader:
-        torch.save(image, "dataSet/tensor_data/Gray/" + str(i) + ".pt")
+        torch.save(image, "Photo/tensor_data/Depth/" + str(i) + ".pt")
         print(i)
 
         """
