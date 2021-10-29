@@ -4,13 +4,19 @@ import math
 import sys
 import copy
 import matplotlib.pyplot as plt
-from numpy.core.fromnumeric import reshape
 
+def LoGFilter(src, sigma):
+    dst = src.copy()
+    dst = cv2.GaussianBlur(dst, (5, 5), sigma)
+    dst = cv2.Laplacian(dst, -1, ksize=5)
+    return dst
 
-#RGBが同じピクセルほど光源の影響がでやすい -> 白またはグレーのピクセルが欲しい
+#RGBが同じピクセルほど光源の影響がでやすい ->　白またはグレーのピクセルが欲しい
 #完全２５５の白は情報がなさすぎるから困る
-raw = cv2.imread("images/figure2a.png")
+raw = cv2.imread("images/1.png")
+raw = cv2.resize(raw, (500, 500))
 height, width, channels = raw.shape[:3]
+sigma = 0.5
 
 R = raw[:, :, 2].astype(np.float_) /255.
 G = raw[:, :, 1].astype(np.float_) /255.
@@ -21,31 +27,28 @@ EPS = sys.float_info.epsilon
 R[R==0] = EPS
 G[G==0] = EPS
 B[B==0] = EPS
-filter_size = (5, 5)
+filter_size = (7, 7)
 
 #denoise
-R = cv2.GaussianBlur(R, filter_size, .5)
-G = cv2.GaussianBlur(G, filter_size, .5)
-B = cv2.GaussianBlur(B, filter_size, .5)
+R = cv2.GaussianBlur(R, filter_size, sigma)
+G = cv2.GaussianBlur(G, filter_size, sigma)
+B = cv2.GaussianBlur(B, filter_size, sigma)
 
-#matlabコードベースのGI計算 たぶん論文のまま書いても大丈夫
+#matlabコードベースのGI計算　たぶん論文のまま書いても大丈夫
 #https://github.com/yanlinqian/Grayness-Index/blob/master/greypixel_kaifu/GetGreyidx.m
 
 #多分グレーっぽさを計算
 log_r = np.log(R)
-Mr = cv2.GaussianBlur(log_r, filter_size, .5)
-#Mr = cv2.Laplacian(Mr, -1, ksize=5)
-#Mr = cv2.filter2D(log_r, -1, C)
+#Mr = cv2.GaussianBlur(log_r, filter_size, sigma)
+Mr = LoGFilter(log_r, sigma)
 
 log_b = np.log(B)
-Mb = cv2.GaussianBlur(log_b, filter_size, .5)
-#Mb = cv2.Laplacian(Mb, -1, ksize=5)
-#Mb = cv2.filter2D(log_b, -1, C)
+#Mb = cv2.GaussianBlur(log_b, filter_size, sigma)
+Mb = LoGFilter(log_b, sigma)
 
 log_g = np.log(G)
-Mg = cv2.GaussianBlur(log_g, filter_size, .5)
-#Mg = cv2.Laplacian(Mg, -1, ksize=5)
-#Mg = cv2.filter2D(log_g, -1, C)
+#Mg = cv2.GaussianBlur(log_g, filter_size, sigma)
+Mg = LoGFilter(log_g, sigma)
 
 data = [Mb, Mg, Mr]
 Ds = np.std(data, 0)
@@ -53,12 +56,10 @@ Ds = Ds / (np.average(Ds))
 
 data1 = [B,G,R]
 Ps = Ds / (np.average(data1))
+Greyidx = Ps / np.max(Ps)
 
-#GIz
-Greyidx = Ps#reshape(Ps, (height, width))
-Greyidx /= (Greyidx.max() + EPS)
-Greyidx[np.where((Mr<EPS) & (Mg<EPS) & (Mb<EPS))] = Greyidx.max()
-result = cv2.blur(Greyidx, (7, 7))
+#GI
+result = cv2.blur(Greyidx, filter_size)
 
 #GIのピクセル強度上位５％を抜き出す
 target_pixel = np.resize(result, height*width)
@@ -77,21 +78,16 @@ target_pixel_result[target_pixel_result == -1] = 1
 #RGBの各チャネルの周辺の値変動がないとそこら一体は同一色である
 #閾値処理をかけて色制限（基本的に白背景に光源色のあったったグレーピクセルが欲しい)
 #式12の実装？ 各チャネルのガウシアン後の閾値処理
-delt_r = cv2.GaussianBlur(R, filter_size, .5)
-#delt_r = cv2.Laplacian(delt_r, -1, ksize=5)
-
-delt_g = cv2.GaussianBlur(G, filter_size, .5)
-#delt_g = cv2.Laplacian(delt_g, -1, ksize=5)
-
-delt_b = cv2.GaussianBlur(B, filter_size, .5)
-#delt_b = cv2.Laplacian(delt_b, -1, ksize=5)
-
-# delt_r = cv2.filter2D(R, -1, C)
-# delt_g = cv2.filter2D(G, -1, C)
-# delt_b = cv2.filter2D(B, -1, C)
+sigma = 0.5
+delt_r = cv2.GaussianBlur(R, filter_size, sigma)
+delt_g = cv2.GaussianBlur(G, filter_size, sigma)
+delt_b = cv2.GaussianBlur(B, filter_size, sigma)
+# delt_r = LoGFilter(R, sigma)
+# delt_g = LoGFilter(G, sigma)
+# delt_b = LoGFilter(B, sigma)
 
 #要調整
-delta_threshold = 0.0004
+delta_threshold = 0.6
 delt_r = cv2.threshold(delt_r, delta_threshold, 1, cv2.THRESH_BINARY)[1]
 delt_g = cv2.threshold(delt_g, delta_threshold, 1, cv2.THRESH_BINARY)[1]
 delt_b = cv2.threshold(delt_b, delta_threshold, 1, cv2.THRESH_BINARY)[1]
@@ -106,15 +102,48 @@ mask = cv2.bitwise_and(target_pixel_result, mask)
 target = copy.copy(raw)
 target[mask==0] = 0
 
+color = np.zeros((200, 200, 3), np.float32)
+color[:, :, 0] = R[mask != 0].sum() / mask.sum()
+color[:, :, 1] = G[mask != 0].sum() / mask.sum()
+color[:, :, 2] = B[mask != 0].sum() / mask.sum()
+
+hsv_color = cv2.cvtColor(color, cv2.COLOR_RGB2HSV)
+hsv_color[:, :, 2] = 1
+result_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)
+
 result = (result*255).astype(np.uint8)
 target_pixel_result = (target_pixel_result*255).astype(np.uint8)
 
-color = np.zeros((200, 200, 3), np.float32)
-#color = 
+plt.figure()
+plt.title("RAW")
+plt.imshow(cv2.cvtColor(raw, cv2.COLOR_BGR2RGB))
 
-cv2.imshow("RAW", raw)
-cv2.imshow("Intensity", result)
-cv2.imshow("target_pixel", target)
-cv2.imshow("mask", mask*255)
-cv2.waitKey()
-cv2.destroyAllWindows()
+plt.figure()
+plt.title("Intensity")
+plt.imshow(result)
+
+plt.figure()
+plt.title("target_pixel")
+plt.imshow(cv2.cvtColor(target, cv2.COLOR_BGR2RGB))
+
+plt.figure()
+plt.title("mask")
+plt.imshow(mask*255)
+
+plt.figure()
+plt.title("color")
+plt.imshow(color)
+
+plt.figure()
+plt.title("result_color")
+plt.imshow(cv2.cvtColor(result_color, cv2.COLOR_BGR2RGB))
+plt.show()
+
+# cv2.imshow("RAW", raw)
+# cv2.imshow("Intensity", result)
+# cv2.imshow("target_pixel", target)
+# cv2.imshow("mask", mask*255)
+# cv2.imshow("color", color)
+# cv2.imshow("result_color", result_color)
+# cv2.waitKey()
+# cv2.destroyAllWindows()
