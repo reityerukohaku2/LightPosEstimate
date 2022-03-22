@@ -1,4 +1,5 @@
 import cv2
+from matplotlib.colors import rgb_to_hsv
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -11,88 +12,177 @@ def min_max(x, axis=None):
     result = result * 255
     return result
 
+def LoGFilter(src, ksize, sigma):
+    # C = np.array([[0, 0, 1, 0, 0],
+    #               [0, 1, 2, 1, 0],
+    #               [1, 2, -16, 2, 1],
+    #               [0, 1, 2, 1, 0],
+    #               [0, 0, 1, 0, 0]])
+    dst = src
+    dst = cv2.GaussianBlur(dst, ksize, sigma)
+    #dst = cv2.Laplacian(dst, -1, ksize)
+
+
+    # dst = cv2.filter2D(src, -1, C)
+    return dst
+
 raw = cv2.imread("images/figure2a.png")
-raw = raw
-raw = raw.astype(np.float_)
-raw = raw / 255
+#raw = cv2.resize(raw, (500, 500))
+height, width, channel = raw.shape
 
-B,G,R = cv2.split(raw)
+#raw = raw
+#raw_float = np.ones((height, width, channel), np.float32)
+raw_float = raw.astype(np.float32) / 255
+#raw = raw / 255
 
-#7*7でRGB平均化
-R = cv2.blur(R, (7, 7))
+B,G,R = cv2.split(raw_float)
+#R /= 255
+#G /= 255
+#B /= 255
+
+#I = np.sqrt(I)
+
+
+ksize = (5, 5)
+sigma = 0.5
+# #CはLoGフィルタ
+# C = np.empty([ksize,ksize],dtype='float')
+# sigma = 0.5
+# for y in range(0, ksize):
+#     for x in range(0, ksize):
+#         C[x,y] = (x**2 + y**2 - 2 * sigma**2) * math.exp(-(x**2 + y**2) / (2 * sigma**2)) / (2 * math.pi * sigma**6)
+
+#デノイズ
+''' R = cv2.blur(R, (7, 7))
 G = cv2.blur(G, (7, 7))
 B = cv2.blur(B, (7, 7))
 
-np.where(R == 0, 0.0001, R)
-np.where(G == 0, 0.0001, G)
-np.where(B == 0, 0.0001, B)
+#0の値を極小値に置き換え(0除算回避)
+eps = 2.2204e-16
+R = np.where(R <= 0, eps, R)
+G = np.where(G <= 0, eps, G)
+B = np.where(B <= 0, eps, B)
 
+#式（11）
 I = R + G + B
-#I = np.sqrt(I)
-
-'''
-C = np.array([[0, 0, 1, 0, 0],
-              [0, 1, 2, 1, 0],
-              [1, 2, -16, 2, 1],
-              [0, 1, 2, 1, 0],
-              [0, 0, 1, 0, 0]])
-'''
-
-ksize=5
-C=np.empty([ksize,ksize],dtype='float')
-sigma=0.3*(ksize/2-1)+0.8
-for y in range(int(-ksize/2),int(ksize/2)):
-    for x in range(int(-ksize/2),int(ksize/2)):
-        C[x,y]=(x**2+y**2-2*(sigma**2))/(2*3.14*sigma**6)*math.exp(-(x**2+y**2)/(2*sigma**2))
-print(C)
-
-#mask low contrast pixels
-delta_r = cv2.filter2D(R, -1, C)
-delta_g = cv2.filter2D(G, -1, C)
-delta_b = cv2.filter2D(B, -1, C)
-np.where(R == delta_r, 255, R)
-np.where(G == delta_g, 255, G)
-np.where(B == delta_b, 255, B)
-
-
 log_i = np.log(I)
-
 log_r = np.log(R) - log_i
-log_r = cv2.filter2D(log_r, -1, C)
-#log_r = cv2.GaussianBlur(log_r, (5, 5), 3)
-#log_r = cv2.Laplacian(log_r, cv2.CV_32F, ksize=5)
-
+log_r = LoGFilter(log_r, ksize, sigma)
 log_b = np.log(B) - log_i
-log_b = cv2.filter2D(log_b, -1, C)
-#log_b = cv2.GaussianBlur(log_b, (5, 5), 3)
-#log_b = cv2.Laplacian(log_b, cv2.CV_32F, ksize=5)
+log_b = LoGFilter(log_b, ksize, sigma)
+preGI = np.sqrt((log_b + log_r  )**2 + 2)
 
-preGI = np.sqrt(log_b**2 + log_r**2)
+#式(12)
+#コントラストが低い画素をマスクする
+E = 1e-4
+mask = np.ones((height, width, 1), np.uint8)
+CR = LoGFilter(R, ksize, sigma)
+CG = LoGFilter(G, ksize, sigma)
+CB = LoGFilter(B, ksize, sigma)
+GI = preGI
+GIMax = GI.max()
+GI[np.where((CR <= E) | (CG <= E) | (CB <= E))] = GIMax
 
-ranked = preGI.flatten(preGI)
-print(ranked)
+#(7, 7)で平均化
+GI = cv2.blur(GI, (7, 7)) '''
 
-"""
-R = min_max(R).astype(np.uint8)
-G = min_max(G).astype(np.uint8)
-B = min_max(B).astype(np.uint8)
-I = min_max(I).astype(np.uint8)
+#----------------------------------------------------------------------------------------------------------------
+#MatLab準拠で書いてみる
+#https://github.com/yanlinqian/Grayness-Index/blob/master/runme.m
 
-log_b = (min_max(log_b)).astype(np.uint8)
-log_r = (min_max(log_r)).astype(np.uint8)
-preGI = (min_max(preGI)).astype(np.uint8)
+#極端に明るいピクセルと暗いピクセルをマスクする
+''' mask = np.zeros((height, width, 1))
+mask[np.where(raw_float[:, :, 0] >= 0.95)] = 1
+mask[np.where(raw_float[:, :, 1] >= 0.95)] = 1
+mask[np.where(raw_float[:, :, 2] >= 0.95)] = 1
+test = np.zeros((height, width, channel), np.float32)
+test = raw_float[:, :, 0] + raw_float[:, :, 1] + raw_float[:, :, 2]
 
-raw = min_max(raw).astype(np.uint8)
-cv2.imshow("RAW", raw)
-cv2.imshow("Red", R)
-cv2.imshow("Green", G)
-cv2.imshow("Blue", B)
-cv2.imshow("log_r", log_r)
-cv2.imshow("log_b", log_b)
-cv2.imshow("Intensity", preGI)
-plt.imshow(preGI, cmap=plt.cm.brg)
-plt.colorbar()
+mask[np.where(raw_float[:, :, 0] + raw_float[:, :, 1] + raw_float[:, :, 2] <= 0.0315)] = 1
+
+plt.imshow(mask)
 plt.show()
 
-cv2.waitKey()
-"""
+ksize = (5, 5)
+sigma = 5
+Mr = LoGFilter(np.log(R), ksize, sigma).flatten()
+Mg = LoGFilter(np.log(G), ksize, sigma).flatten()
+Mb = LoGFilter(np.log(B), ksize, sigma).flatten()
+
+data = np.array([Mr, Mg, Mb])
+data[0][np.where(Mr == 0)] = eps
+data[1][np.where(Mg == 0)] = eps
+data[2][np.where(Mb == 0)] = eps
+data = data.transpose(1, 0)
+
+gt = np.ones(data.shape[1], np.float32) / np.linalg.norm(np.ones(data.shape[1], np.float32))
+
+#行ごとに分割
+data_split = np.split(data, data.shape[0])
+
+dot = []
+for i in range(data.shape[0]):
+    data_normed = np.abs(data_split[i] / np.linalg.norm(data_split[i]))
+    dot.append(np.inner(data_normed, gt))
+
+acos = np.arccos(dot)
+angular_error = np.real(acos)
+
+#angular_error = angular_error / lumi_factor
+Greyidx_angular = np.reshape(angular_error, (height, width))
+
+ReshapeMr = np.reshape(Mr, (height, width))
+ReshapeMg = np.reshape(Mg, (height, width))
+ReshapeMb = np.reshape(Mb, (height, width))
+
+del_idx = np.where((ReshapeMr < eps) & (ReshapeMg < eps) & (ReshapeMb < eps))
+Greyidx_angular[del_idx] = np.nanmax(Greyidx_angular)
+
+Greyidx_angular = cv2.blur(Greyidx_angular, (7, 7)) '''
+
+#最もグレーである可能性が高い上位1%のピクセルを取得
+#まずは1次元配列にしてソート
+tt = np.sort(GI.flatten())
+Gidx = np.ones((height, width))
+numGPs = int(GI.size * 0.001)
+Gidx[np.where(GI <= tt[numGPs])] = 0
+
+#下位1%のインデックスを保存
+RR = np.sum(R[np.where(Gidx == 0)]) / numGPs
+GG = np.sum(G[np.where(Gidx == 0)]) / numGPs
+BB = np.sum(B[np.where(Gidx == 0)]) / numGPs
+
+colorImg = np.zeros((200, 200, 3), np.float32)
+colorImg[:, :, 0].fill(RR)
+colorImg[:, :, 1].fill(GG)
+colorImg[:, :, 2].fill(BB)
+#HSVImage = cv2.cvtColor(colorImg, cv2.COLOR_RGB2HSV)
+
+#輝度補正
+#print(HSVImage)
+#HSVImage[:, :, 2] = 1
+
+#colorImg = cv2.cvtColor(HSVImage, cv2.COLOR_HSV2RGB)
+
+#画像出力
+plt.figure()
+plt.title("Color")
+plt.imshow(colorImg)
+
+plt.figure()
+raw = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+plt.title("raw")
+plt.imshow(raw)
+
+plt.figure()
+plt.title("mask")
+plt.imshow(Gidx, cmap="Greys")
+plt.colorbar()
+
+plt.figure()
+plt.title("Greyidx")
+plt.imshow(GI, cmap = "rainbow")
+plt.colorbar()
+
+plt.show()
+print(0)
