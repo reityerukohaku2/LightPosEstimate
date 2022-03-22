@@ -17,7 +17,7 @@ class MyDataSet(torch.utils.data.Dataset):
         y = []
         z = []
 
-        path = "Photo/Train.csv"   #csvファイルのパスを指定する
+        path = "Photo3/Train.csv"   #csvファイルのパスを指定する
         label = pd.read_csv(filepath_or_buffer=path, encoding="UTF-8", sep=",", index_col=0, header=None, skiprows=2)
 
         #外れ値ID(0スタート)
@@ -45,8 +45,8 @@ class MyDataSet(torch.utils.data.Dataset):
         # ここに入力データとラベルを入れる
         #self.RGBimagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/RGB/").glob("*.png")]
         #self.DepthImagePaths = [str(p) for p in Path("C:/Users/moko0/OneDrive/ドキュメント/repos/SyuraiRinjin/TrainData2/Photo/Depth/").glob("*.png")]
-        self.RGBimagePaths = [str(p) for p in Path("Photo/tensor_data/Gray/").glob("*.pt")]
-        self.DepthImagePaths = [str(p) for p in Path("Photo/tensor_data/Depth/").glob("*.pt")]
+        self.RGBimagePaths = [str(p) for p in Path("Photo3/tensor_data/Gray/").glob("*.pt")]
+        self.DepthImagePaths = [str(p) for p in Path("Photo3/tensor_data/Depth/").glob("*.pt")]
 
         #ファイル名ソート用
         def atoi(text):
@@ -84,7 +84,7 @@ class MyDataSet(torch.utils.data.Dataset):
         #DepthImage = torch.from_numpy(np.load(file=self.DepthImagePaths[idx]))
         out_RGBimage = torch.load(self.RGBimagePaths[idx])
         out_DepthImage = torch.load(self.DepthImagePaths[idx])
-        out_DepthImage = torch.squeeze(out_DepthImage, 0)
+        #out_DepthImage = torch.squeeze(out_DepthImage, 0)
         #RGBimage = io.read_image(path=self.RGBimagePaths[idx], mode=io.image.ImageReadMode.RGB)
         #DepthImage = io.read_image(path=self.DepthImagePaths[idx], mode=io.image.ImageReadMode.GRAY)
         #RGBimage = Image.open(self.RGBimagePaths[idx]).convert("RGB")

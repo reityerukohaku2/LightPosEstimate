@@ -1,4 +1,6 @@
 Photo/
+Photo2/
+Photo3/
 logs/
 dataSet/
 __pychache__/
@@ -6,3 +8,7 @@ __pychache__/
 model
 *.onnx
 main.ipynb
+!NewOOPArt200_2022.pth
+!NewOOPArt200_2022.onnx
+!direction_repaired2.onnx
+!direction_repaired2.pth

@@ -35,7 +35,7 @@ class PreProcessDataSet(torch.utils.data.Dataset):
         ).cuda()
 
         # ここに入力データとラベルを入れる
-        self.RGBimagePaths = [str(p) for p in Path("Photo/Depth").glob("*.png")]
+        self.RGBimagePaths = [str(p) for p in Path("Photo3/Depth").glob("*.png")]
 
         #ファイル名ソート用
         def atoi(text):
@@ -71,7 +71,7 @@ class PreProcessDataSet(torch.utils.data.Dataset):
         GrayImage = self.FirstTransform(RGBimage)
 
         #numpy配列に変換
-        #GrayImage = np.transpose(GrayImage.numpy(), (1, 2, 0))
+        GrayImage = np.transpose(GrayImage.numpy(), (1, 2, 0))
 
         #バイラテラルフィルタ(domain transform filter)
         #GrayImage = cv2.cv2.ximgproc.dtFilter(GrayImage, GrayImage, 0, 32)
@@ -80,11 +80,15 @@ class PreProcessDataSet(torch.utils.data.Dataset):
         #clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(4,4))
         #GrayImage = clahe.apply(GrayImage.astype(np.uint8))
 
-        #tensorに変換
-        #out_image = torch.from_numpy(GrayImage.astype(np.float32))
-        #out_image = out_image / 256.0
+        #ヒストグラム平坦化
+        GrayImage = cv2.equalizeHist(GrayImage.astype(np.uint8))
 
-        return GrayImage #out_image
+        #tensorに変換
+        out_image = GrayImage
+        out_image = torch.from_numpy(out_image.astype(np.float32))
+        out_image = out_image / 255.0
+
+        return out_image
 
 #データセットの保存
 def loop():
@@ -93,7 +97,7 @@ def loop():
 
     i = 0
     for image in dataLoader:
-        torch.save(image, "Photo/tensor_data/Depth/" + str(i) + ".pt")
+        torch.save(image, "Photo3/tensor_data/Depth/" + str(i) + ".pt")
         print(i)
 
         """
