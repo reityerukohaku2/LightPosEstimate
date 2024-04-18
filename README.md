@@ -1,3 +1,7 @@
 # LightPosEstimate
-A learning model for estimating the position of light sources from RGB-D images based on ResNet50.<br>
-PyTorch was used to build the learning model.
+ResNet50に基づくRGB-D画像からの光源位置推定学習モデル。
+学習モデルの構築にはPyTorchを使用しています。
+
+> [!NOTE]
+> 研究室の共有PCで開発を行っていたため、Contributorに他の人の名前が入っていますが
+> 全て `reityerukohaku2` が開発を行っています。
