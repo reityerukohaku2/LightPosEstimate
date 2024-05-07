@@ -8,4 +8,4 @@ ResNet50に基づくRGB-D画像からの光源位置推定学習モデル。
 
 ## 論文
 本リポジトリの修士論文を以下に公開しています。<br>
-[Mixed Realityにおける光源推定の一手法](/Mixed%20Realityにおける光源推定の一手法.pdf)
+[Mixed Realityにおける光源推定の一手法](A_Method_of_Light_Source_Estimation_for_Mixed_Reality.pdf)
